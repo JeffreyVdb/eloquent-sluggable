@@ -64,6 +64,10 @@ class SluggableServiceProvider extends ServiceProvider {
 	 */
 	public function registerEvents()
 	{
+        if (config('sluggable.listen') === false) {
+            return;
+        }
+
 		$this->app['events']->listen('eloquent.saving*', function($model)
 		{
 			if ($model instanceof SluggableInterface)
