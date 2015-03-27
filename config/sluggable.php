@@ -1,7 +1,5 @@
 <?php
-
-
-return array(
+return [
 
 	/**
 	 * What attributes do we use to build the slug?
@@ -124,4 +122,4 @@ return array(
 	 */
 	'use_cache' => false,
 
-);
+];

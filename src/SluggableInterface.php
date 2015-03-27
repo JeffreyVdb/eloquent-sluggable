@@ -1,6 +1,6 @@
 <?php
 
-namespace Cviebrock\EloquentSluggable;
+namespace JeffreyVdb\EloquentSluggable;
 
 
 interface SluggableInterface {

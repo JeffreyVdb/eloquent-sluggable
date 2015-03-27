@@ -1,4 +1,5 @@
-<?php namespace Cviebrock\EloquentSluggable;
+<?php
+namespace JeffreyVdb\EloquentSluggable;
 
 use Illuminate\Database\Console\Migrations\BaseCommand;
 use Illuminate\Database\Migrations\MigrationCreator;

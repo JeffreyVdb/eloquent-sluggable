@@ -1,5 +1,5 @@
-<?php namespace Cviebrock\EloquentSluggable;
-
+<?php
+namespace JeffreyVdb\EloquentSluggable;
 
 use Illuminate\Support\ServiceProvider;
 
