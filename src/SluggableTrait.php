@@ -1,31 +1,41 @@
 <?php
 namespace JeffreyVdb\EloquentSluggable;
 
+use DevIT\Locales\Locale;
 use Illuminate\Support\Str;
 
 trait SluggableTrait
 {
     protected $sluggableConfig;
 
-    protected function needsSlugging()
+    protected function needsSlugging($key = null)
     {
         $config = $this->getSluggableConfig();
         $save_to = $config['save_to'];
         $on_update = $config['on_update'];
 
-        if (empty($this->{$save_to})) {
-            return true;
-        }
+        if (! $key) {
+            if (empty($this->{$save_to})) {
+                return true;
+            }
 
-        if ($this->isDirty($save_to)) {
-            return false;
+            if ($this->isDirty($save_to)) {
+                return false;
+            }
+        }
+        else {
+            if (! isset($this->attributes[$save_to][$key]) ||
+                empty($this->attributes[$save_to][$key])
+            ) {
+                return true;
+            }
         }
 
         return (! $this->exists || $on_update);
     }
 
 
-    protected function getSlugSource()
+    protected function getSlugSource($key = null)
     {
         $config = $this->getSluggableConfig();
         $from = $config['build_from'];
@@ -34,12 +44,18 @@ trait SluggableTrait
             return $this->__toString();
         }
 
-        $source = array_map(
-            function ($attribute) {
+        if ($key) {
+            $func = function ($attribute) use ($key) {
+                return $this->attributes[$attribute][$key];
+            };
+        }
+        else {
+            $func = function ($attribute) {
                 return $this->{$attribute};
-            },
-            (array) $from
-        );
+            };
+        }
+
+        $source = array_map($func, (array) $from);
 
         return join($source, ' ');
     }
@@ -93,7 +109,7 @@ trait SluggableTrait
 
     }
 
-    protected function makeSlugUnique($slug)
+    protected function makeSlugUnique($slug, $key = null)
     {
         $config = $this->getSluggableConfig();
         if (! $config['unique']) return $slug;
@@ -117,7 +133,7 @@ trait SluggableTrait
 
         // no cache, so we need to check directly
         // find all models where the slug is like the current one
-        $list = $this->getExistingSlugs($slug);
+        $list = $this->getExistingSlugs($slug, $key);
 
         // if ...
         // 	a) the list is empty
@@ -148,15 +164,19 @@ trait SluggableTrait
     }
 
 
-    protected function getExistingSlugs($slug)
+    protected function getExistingSlugs($slug, $key = null)
     {
         $config = $this->getSluggableConfig();
-        $saveToCol = $config['save_to_dbcol'];
+        $save_to = $config['save_to'];
         $include_trashed = $config['include_trashed'];
 
         $instance = new static;
 
-        $query = $instance->where(\DB::raw($saveToCol), 'LIKE', $slug . '%');
+        if ($key) {
+            $save_to = sprintf("%s->'%s'", $save_to, $key);
+        }
+
+        $query = $instance->where(\DB::raw($save_to), 'LIKE', $slug . '%');
 
         // include trashed models if required
         if ($include_trashed && $this->usesSoftDeleting()) {
@@ -165,7 +185,7 @@ trait SluggableTrait
 
         // get a list of all matching slugs
         if (isset($config['i18n_slug']) && $config['i18n_slug'] === true) {
-            $rows = $query->select(\DB::raw($saveToCol . ' AS slug, ' . $this->getKeyName()))
+            $rows = $query->select(\DB::raw($save_to . ' AS slug, ' . $this->getKeyName()))
                 ->get();
 
             $list = [];
@@ -174,7 +194,7 @@ trait SluggableTrait
             }
         }
         else {
-            $list = $query->lists($saveToCol, $this->getKeyName());
+            $list = $query->lists($save_to, $this->getKeyName());
         }
 
         return $list;
@@ -187,11 +207,16 @@ trait SluggableTrait
     }
 
 
-    protected function setSlug($slug)
+    protected function setSlug($slug, $key = null)
     {
         $config = $this->getSluggableConfig();
         $save_to = $config['save_to'];
-        $this->setAttribute($save_to, $slug);
+        if ($key) {
+            $this->attributes[$save_to][$key] = $slug;
+        }
+        else {
+            $this->setAttribute($save_to, $slug);
+        }
     }
 
 
@@ -205,14 +230,36 @@ trait SluggableTrait
 
     public function sluggify($force = false)
     {
-        if ($force || $this->needsSlugging()) {
-            $source = $this->getSlugSource();
-            $slug = $this->generateSlug($source);
+        $config = $this->getSluggableConfig();
+        $makeSlugs = function ($key = null) use ($force) {
+            if ($force || $this->needsSlugging($key)) {
+                $source = $this->getSlugSource($key);
+                $slug = $this->generateSlug($source);
 
-            $slug = $this->validateSlug($slug);
-            $slug = $this->makeSlugUnique($slug);
+                $slug = $this->validateSlug($slug);
+                $slug = $this->makeSlugUnique($slug, $key);
 
-            $this->setSlug($slug);
+                $this->setSlug($slug, $key);
+            }
+        };
+
+        if ($config['i18n_slug'] === true) {
+            // Ensure is an array
+            if (! isset($this->attributes[$config['save_to']])) {
+                $this->attributes[$config['save_to']] = [];
+            }
+            elseif (! is_array($arr = $this->attributes[$config['save_to']])) {
+                $arr = $this->hstoreToArray($arr);
+                $this->attributes[$config['save_to']] = $arr;
+            }
+
+            $buildFrom = $this->attributes[$config['build_from']];
+            foreach (array_keys($buildFrom) as $key) {
+                $makeSlugs($key);
+            }
+        }
+        else {
+            $makeSlugs();
         }
 
         return $this;
@@ -256,13 +303,15 @@ trait SluggableTrait
         }
 
         if (isset($this->sluggableConfig['i18n_slug']) &&
-            $this->sluggableConfig['i18n_slug'] === true) {
+            $this->sluggableConfig['i18n_slug'] === true
+        ) {
 
             $this->sluggableConfig['save_to_dbcol'] = sprintf("%s->'%s'",
                 $this->sluggableConfig['save_to'], \App::getLocale());
         }
         else {
             $this->sluggableConfig['save_to_dbcol'] = $this->sluggableConfig['save_to'];
+            $this->sluggableConfig['i18n_slug'] = false;
         }
 
         return $this->sluggableConfig;
