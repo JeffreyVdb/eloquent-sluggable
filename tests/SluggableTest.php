@@ -45,7 +45,12 @@ class SluggableTest extends TestCase {
 
 		// set up caching configuration
 		$app['config']->set('cache.default', 'redis');
+        $app['config']->set('cache.', 'redis');
 		$app['config']->set('cache.prefix', 'SluggableTest');
+        $app['config']->set('database.redis', [
+            'cluster' => true,
+            'default' => ['host' => '192.168.10.10', 'port' => 6379],
+        ]);
 	}
 
 
@@ -56,7 +61,7 @@ class SluggableTest extends TestCase {
    */
 	protected function getPackageProviders($app)
 	{
-		return array('Cviebrock\EloquentSluggable\SluggableServiceProvider');
+		return array('JeffreyVdb\EloquentSluggable\SluggableServiceProvider');
 	}
 
 

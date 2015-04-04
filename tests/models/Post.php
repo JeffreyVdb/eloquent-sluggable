@@ -1,8 +1,8 @@
 <?php
 
 use Illuminate\Database\Eloquent\Model;
-use Cviebrock\EloquentSluggable\SluggableInterface;
-use Cviebrock\EloquentSluggable\SluggableTrait;
+use JeffreyVdb\EloquentSluggable\SluggableInterface;
+use JeffreyVdb\EloquentSluggable\SluggableTrait;
 
 
 class Post extends Model implements SluggableInterface {
