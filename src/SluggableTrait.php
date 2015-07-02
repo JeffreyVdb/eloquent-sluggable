@@ -46,7 +46,7 @@ trait SluggableTrait
 
         if ($key) {
             $func = function ($attribute) use ($key) {
-                return $this->attributes[$attribute][$key];
+                return $this->getTranslation($attribute, $key);
             };
         }
         else {
@@ -254,6 +254,11 @@ trait SluggableTrait
             }
 
             $buildFrom = $this->attributes[$config['build_from']];
+
+            if (is_string($buildFrom) && in_array($config['save_to'], $this->translatable)) {
+                eval('$buildFrom = [' . trim(preg_replace('/\\$/', '\\\\$', $buildFrom), '\'') . '];');
+            }
+            
             foreach (array_keys($buildFrom) as $key) {
                 $makeSlugs($key);
             }
